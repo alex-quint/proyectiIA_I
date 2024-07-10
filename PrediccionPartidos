@@ -1,0 +1,144 @@
+import pandas as pd
+
+# Cargar los datos desde los archivos CSV
+results = pd.read_csv('results.csv')
+shootouts = pd.read_csv('shootouts.csv')
+goalscorers = pd.read_csv('goalscorers.csv')
+
+# Verificar las primeras filas de cada dataset
+print(results.head())
+print(shootouts.head())
+print(goalscorers.head())
+
+# Eliminar filas con datos nulos
+results.dropna(inplace=True)
+shootouts.dropna(inplace=True)
+goalscorers.dropna(inplace=True)
+
+# Verificar la estructura de los datos
+print(results.info())
+print(shootouts.info())
+print(goalscorers.info())
+
+# Unir los DataFrames en las columnas comunes 'date', 'home_team', y 'away_team'
+data = results.merge(shootouts, on=['date', 'home_team', 'away_team'])
+data = data.merge(goalscorers, on=['date', 'home_team', 'away_team'])
+
+# Verificar las primeras filas del dataset combinado
+print(data.head())
+
+import numpy as np
+
+# Crear la columna 'goal_diff' basada en la diferencia de goles
+data['goal_diff'] = data['home_score'] - data['away_score']
+
+# Crear la etiqueta 'result' basada en los goles anotados
+def result_label(row):
+    if row['home_score'] > row['away_score']:
+        return 'Home Win'
+    elif row['home_score'] < row['away_score']:
+        return 'Away Win'
+    else:
+        return 'Draw'
+
+data['result'] = data.apply(result_label, axis=1)
+
+# Verificar las primeras filas después del preprocesamiento
+print(data.head())
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+
+# Seleccionar las características y la etiqueta
+features = data[['home_score', 'away_score', 'goal_diff']]
+label_encoder = LabelEncoder()
+labels = label_encoder.fit_transform(data['result'])
+
+# Dividir los datos en conjuntos de entrenamiento y prueba
+X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.2, random_state=42)
+
+
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# Crear y entrenar el modelo XGBoost
+model = XGBClassifier()
+model.fit(X_train, y_train)
+
+# Realizar predicciones y evaluar el modelo
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(f'Accuracy: {accuracy}')
+print(classification_report(y_test, y_pred))
+
+##Creacion de partido que se enfrentara
+# Crear un DataFrame para los partidos futuros
+future_matches = pd.DataFrame({
+    'date': ['2024-07-10', '2024-07-11'],
+    'home_team': ['TeamA', 'TeamB'],
+    'away_team': ['TeamC', 'TeamD'],
+    'home_score': [1.5, 2.0],  # Promedios históricos o estimaciones
+    'away_score': [1.2, 1.5]
+})
+
+# Calcular la diferencia de goles para los partidos futuros
+future_matches['goal_diff'] = future_matches['home_score'] - future_matches['away_score']
+
+# Seleccionar características para predicción
+future_features = future_matches[['home_score', 'away_score', 'goal_diff']]
+
+##Realizar predicciones
+future_predictions = model.predict(future_features)
+future_matches['predicted_result'] = label_encoder.inverse_transform(future_predictions)
+
+print(future_matches[['date', 'home_team', 'away_team', 'predicted_result']])
+
+
+##Prediccion resultados posibles.
+# Crear un DataFrame para los partidos futuros
+future_matches = pd.DataFrame({
+    'date': ['2024-07-10', '2024-07-11'],
+    'home_team': ['TeamA', 'TeamB'],
+    'away_team': ['TeamC', 'TeamD'],
+    'home_score': [5.5, 2.0],  # Promedios históricos o estimaciones
+    'away_score': [1.2, 6.5]
+})
+
+# Calcular la diferencia de goles para los partidos futuros
+future_matches['goal_diff'] = future_matches['home_score'] - future_matches['away_score']
+
+# Seleccionar características para predicción
+future_features = future_matches[['home_score', 'away_score', 'goal_diff']]
+
+# Realizar predicciones
+future_predictions = model.predict(future_features)
+future_matches['predicted_result'] = label_encoder.inverse_transform(future_predictions)
+
+print(future_matches[['date', 'home_team', 'away_team', 'predicted_result']])
+
+# Resumen de resultados predichos
+summary = future_matches['predicted_result'].value_counts()
+print(summary)
+
+# Análisis detallado
+print(future_matches)
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Conteo de resultados predichos
+plt.figure(figsize=(8, 6))
+sns.countplot(x='predicted_result', data=future_matches)
+plt.title('Distribución de Resultados Predichos')
+plt.xlabel('Resultado Predicho')
+plt.ylabel('Conteo')
+plt.show()
+
+# Análisis por equipo
+home_wins = future_matches[future_matches['predicted_result'] == 'Home Win']['home_team'].value_counts()
+away_wins = future_matches[future_matches['predicted_result'] == 'Away Win']['away_team'].value_counts()
+draws = future_matches[future_matches['predicted_result'] == 'Draw'][['home_team', 'away_team']]
+
+print("Home Wins:\n", home_wins)
+print("Away Wins:\n", away_wins)
+print("Draws:\n", draws)
